@@ -1,0 +1,36 @@
+mod BAKERY is
+    protecting NAT .
+    including CONFIGURATION .
+
+    subsort Nat < Oid .
+
+    sorts GBState Mode .
+    op [[_]] : Configuration -> GBState
+    ops sleep wait crit : -> Mode [ctor] .
+    --- BProcess | mode : Mode number:Nat
+    sort BProcess .
+    subsort BProcess < Cid .
+    op BProcess : -> BProcess .
+    op mode:_ : Mode -> Attribute [gather (&)] .
+    op number:_ : Nat -> Attribute [gather (&)] .
+    --- Dispenser | next: Nat, last: Nat .
+    sort Dispenser .
+    subsort Dispenser < Cid .
+    op Dispenser : -> Dispenser .
+    op next:_ : Nat -> Attribute [gather (&)] .
+    op last:_ : Nat -> Attribute [gather (&)] .
+
+    vars P D : Oid .
+    vars N L : Nat .
+    vars C : Configuration .
+    rl [despierta] : [[ < D : Dispenser | next: N, last: L > < P : BProcess | mode: sleep , number: 0 > C]] => 
+                [[ < D : Dispenser | next: N, last: s L > < P : BProcess | mode : wait , number: L > C]] .
+
+    rl [entra] : [[ < D : Dispenser | next: N, last: L > < P : BProcess | mode: wait , number: N > C]] => 
+                [[ < D : Dispenser | next: N, last: L > < P : BProcess | mode : crit , number: N > C]] .
+
+    rl [sale] : [[ < D : Dispenser | next: N, last: L > < P : BProcess | mode: crit , number: N > C]] => 
+                [[ < D : Dispenser | next: s N, last: L > < P : BProcess | mode : sleep , number: 0 > C]] .
+
+
+endm
