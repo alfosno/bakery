@@ -4,19 +4,17 @@ mod BAKERY is
 
     subsort Nat < Oid .
 
-    sorts GBState Mode .
+    sorts GBState Mode BProcess Dispenser .
     op [[_]] : Configuration -> GBState .
     ops sleep wait crit : -> Mode [ctor] .
-    --- BProcess | mode : Mode number:Nat
-    sort BProcess .
-    subsort BProcess < Cid .
+
+    subsort Dispenser BProcess < Cid .
     op BProcess : -> BProcess .
+    op Dispenser : -> Dispenser .
+
+
     op mode:_ : Mode -> Attribute [gather (&)] .
     op number:_ : Nat -> Attribute [gather (&)] .
-    --- Dispenser | next: Nat, last: Nat .
-    sort Dispenser .
-    subsort Dispenser < Cid .
-    op Dispenser : -> Dispenser .
     op next:_ : Nat -> Attribute [gather (&)] .
     op last:_ : Nat -> Attribute [gather (&)] .
 
