@@ -1,3 +1,5 @@
+load model-checker.maude .
+
 mod BAKERY is
     protecting NAT .
     including CONFIGURATION .
@@ -36,4 +38,109 @@ mod BAKERY is
     op init : Nat -> Configuration .
     eq init (1) = < 1 : BProcess | mode: sleep, number: 0 > .
     eq init (s N) = < s N : BProcess | mode: sleep, number: 0 > init (N) . 
+
 endm
+
+
+mod ABSTRACT-BAKERY is 
+	including BAKERY .
+	protecting NAT .
+
+	vars N J L P rest : Nat .
+	var M : Mode .
+	var C : Configuration .
+
+	ceq [[ < 0 : Dispenser | next: N, last: J > C ]] = [[< 0 : Dispenser | next: 1, last: s (sd(N,J)) > decOrder(C, sd(N,1))]] if N > 1 .
+
+	op decOrder : Configuration Nat -> Configuration .
+	eq decOrder (none, rest) = none .
+	eq decOrder (< P : BProcess | mode: M, number: 0 > C , rest) = < P : BProcess | mode: M, number: 0 > decOrder(C, rest) .
+	eq decOrder (< P : BProcess | mode: M, number: L > C , rest) = < P : BProcess | mode: M, number: sd(L,rest) > decOrder(C, rest) .
+
+endm 
+
+
+mod ABSTRACT-BAKERY-PREDS is 
+	protecting ABSTRACT-BAKERY .
+	including SATISFACTION .
+
+	subsort GBState < State .
+
+	op critical-proc : Nat -> Prop .
+	op no-critical-proc : Nat -> Prop .
+	op proc-status : Nat Mode -> Prop .
+
+	var P N : Nat .
+	var M : Mode .
+	var C : Configuration .
+
+	eq [[< P : BProcess | mode: crit, number: N > C]] |= critical-proc(P) = true . 
+	eq [[< P : BProcess | mode: wait, number: N > C]] |= no-critical-proc(P) = true . 
+	eq [[< P : BProcess | mode: sleep, number: N > C]] |= no-critical-proc(P) = true . 
+	eq [[< P : BProcess | mode: M, number: N > C]] |= proc-status(P,M) = true . 
+
+	
+endm
+
+
+mod ABSTRACT-BAKERY-CHECK is
+    protecting ABSTRACT-BAKERY-PREDS .
+    including MODEL-CHECKER .
+    including LTL-SIMPLIFIER .
+endm
+
+
+
+
+
+eof
+
+[Q2] 
+Maude> search [1, 100] initial(5) =>* [[C:Configuration < P : BProcess | mode: crit, number: N:Nat > < P : BProcess | mode: crit, number: M:Nat > ]] .
+search [1, 100] in BAKERY : initial(5) =>* [[C < P : BProcess | mode: crit,number: N > < P : BProcess | mode: crit,number: M:Nat >]] .
+
+No solution.
+states: 21129  rewrites: 41846 in 188ms cpu (186ms real) (222585 rewrites/second)
+
+[Q3]
+Maude> search [1, 100] initial(5) =>! G:GBState .
+search [1, 100] in BAKERY : initial(5) =>! G:GBState .
+
+No solution.
+states: 21314  rewrites: 42031 in 172ms cpu (172ms real) (244366 rewrites/second)
+
+[Q6]
+Maude> red modelCheck(initial(5), [] ((critical-proc(1) /\ no-critical-proc(2) /\ no-critical-proc(3) /\ no-critical-proc(4) /\ no-critical-proc(5)) \/ 
+>                                 (no-critical-proc(1) /\ critical-proc(2) /\ no-critical-proc(3) /\ no-critical-proc(4) /\ no-critical-proc(5)) \/ 
+>                                 (no-critical-proc(1) /\ no-critical-proc(2) /\ critical-proc(3) /\ no-critical-proc(4) /\ no-critical-proc(5)) \/
+>                                 (no-critical-proc(1) /\ no-critical-proc(2) /\ no-critical-proc(3) /\ critical-proc(4) /\ no-critical-proc(5)) \/
+>                                 (no-critical-proc(1) /\ no-critical-proc(2) /\ no-critical-proc(3) /\ no-critical-proc(4) /\ critical-proc(5)) \/
+>                                 (no-critical-proc(1) /\ no-critical-proc(2) /\ no-critical-proc(3) /\ no-critical-proc(4) /\ no-critical-proc(5))
+>                                 )) .
+reduce in ABSTRACT-BAKERY-CHECK : modelCheck(initial(5), [](no-critical-proc(5) /\ (no-critical-proc(4) /\ (no-critical-proc(3) /\ (no-critical-proc(1) /\ no-critical-proc(2))))
+    \/ (critical-proc(5) /\ (no-critical-proc(4) /\ (no-critical-proc(3) /\ (no-critical-proc(1) /\ no-critical-proc(2)))) \/ (no-critical-proc(5) /\ (critical-proc(4) /\ (
+    no-critical-proc(3) /\ (no-critical-proc(1) /\ no-critical-proc(2)))) \/ (no-critical-proc(5) /\ (no-critical-proc(4) /\ (critical-proc(3) /\ (no-critical-proc(1) /\
+    no-critical-proc(2)))) \/ (no-critical-proc(5) /\ (no-critical-proc(4) /\ (no-critical-proc(3) /\ (critical-proc(1) /\ no-critical-proc(2)))) \/ no-critical-proc(5) /\ (
+    no-critical-proc(4) /\ (no-critical-proc(3) /\ (critical-proc(2) /\ no-critical-proc(1)))))))))) .
+rewrites: 204055 in 676ms cpu (674ms real) (301856 rewrites/second)
+result Bool: true
+
+[Q7] 
+Maude> red modelCheck(initial(5), [] ( ([] (proc-status(1,sleep) -> <> proc-status (1,wait))) /\ ([] (proc-status(1,wait) -> <> proc-status (1,crit))) /\ ([] (proc-status(1,crit) -> <> proc-status (1,sleep))) 
+	\/ ([] (proc-status(2,sleep) -> <> proc-status (2,wait))) /\ ([] (proc-status(2,wait) -> <> proc-status (2,crit))) /\ ([] (proc-status(2,crit) -> <> proc-status (2,sleep)))
+	\/ ([] (proc-status(3,sleep) -> <> proc-status (3,wait))) /\ ([] (proc-status(3,wait) -> <> proc-status (3,crit))) /\ ([] (proc-status(3,crit) -> <> proc-status (3,sleep))) 
+	\/ ([] (proc-status(4,sleep) -> <> proc-status (4,wait))) /\ ([] (proc-status(4,wait) -> <> proc-status (4,crit))) /\ ([] (proc-status(4,crit) -> <> proc-status (4,sleep))) 
+	\/ ([] (proc-status(5,sleep) -> <> proc-status (5,wait))) /\ ([] (proc-status(5,wait) -> <> proc-status (5,crit))) /\ ([] (proc-status(5,crit) -> <> proc-status (5,sleep))))) .
+reduce in ABSTRACT-BAKERY-CHECK : modelCheck(initial(5), []([](proc-status(5, crit) -> <> proc-status(5, sleep)) /\ ([](proc-status(5, sleep) -> <> proc-status(5, wait)) /\ [](
+    proc-status(5, wait) -> <> proc-status(5, crit))) \/ ([](proc-status(4, crit) -> <> proc-status(4, sleep)) /\ ([](proc-status(4, sleep) -> <> proc-status(4, wait)) /\ [](
+    proc-status(4, wait) -> <> proc-status(4, crit))) \/ ([](proc-status(3, crit) -> <> proc-status(3, sleep)) /\ ([](proc-status(3, sleep) -> <> proc-status(3, wait)) /\ [](
+    proc-status(3, wait) -> <> proc-status(3, crit))) \/ ([](proc-status(1, crit) -> <> proc-status(1, sleep)) /\ ([](proc-status(1, sleep) -> <> proc-status(1, wait)) /\ [](
+    proc-status(1, wait) -> <> proc-status(1, crit))) \/ [](proc-status(2, crit) -> <> proc-status(2, sleep)) /\ ([](proc-status(2, sleep) -> <> proc-status(2, wait)) /\ [](
+    proc-status(2, wait) -> <> proc-status(2, crit)))))))) .
+rewrites: 33986 in 636ms cpu (633ms real) (53437 rewrites/second)
+result Bool: true
+
+
+
+
+
