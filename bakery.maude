@@ -1,4 +1,4 @@
-load model-checker.maude .
+load model-checker.maude
 
 mod BAKERY is
     protecting NAT .
@@ -41,12 +41,12 @@ mod BAKERY is
 
 endm
 
-
 mod ABSTRACT-BAKERY is 
 	including BAKERY .
 	protecting NAT .
 
-	vars N J L P rest : Nat .
+	var P : Oid .
+	vars N J L rest : Nat .
 	var M : Mode .
 	var C : Configuration .
 
@@ -70,7 +70,8 @@ mod ABSTRACT-BAKERY-PREDS is
 	op no-critical-proc : Nat -> Prop .
 	op proc-status : Nat Mode -> Prop .
 
-	var P N : Nat .
+	var P : Oid .
+	var N : Nat .
 	var M : Mode .
 	var C : Configuration .
 
@@ -79,7 +80,6 @@ mod ABSTRACT-BAKERY-PREDS is
 	eq [[< P : BProcess | mode: sleep, number: N > C]] |= no-critical-proc(P) = true . 
 	eq [[< P : BProcess | mode: M, number: N > C]] |= proc-status(P,M) = true . 
 
-	
 endm
 
 
@@ -89,11 +89,101 @@ mod ABSTRACT-BAKERY-CHECK is
     including LTL-SIMPLIFIER .
 endm
 
+mod BAKERY+ is 
+	extending BAKERY .
+
+	var M : Mode .
+
+	op nextTurn : Configuration Nat -> Nat .	*** Calculamos cual tendría que ser el siguiente
+	eq nextTurn (none, N) = N .
+	eq nextTurn (< P : BProcess | mode: M, number: num >, N ) = num .
+	ceq nextTurn (< P : BProcess | mode: M, number: num > C, N ) = min(num, nextTurn(C, N)) if C =/= none .
+
+
+	op noSleep : Configuration -> Configuration .	*** Nos aseguramos de que el proceso no esta en sleep
+	eq noSleep (none) = none .		
+	eq noSleep (< P : BProcess | mode: wait, number: num > C) = < P : BProcess | mode: wait, number: num > noSleep(C) .
+	eq noSleep (< P : BProcess | mode: crit, number: num > C) = < P : BProcess | mode: crit, number: num > noSleep(C) .
+	eq noSleep (< P : BProcess | mode: crit, number: num > C) = noSleep(C) .
+
+
+	vars P D : Oid .
+	vars N L num : Nat .
+	var C : Configuration .
+
+	rl [go-sleep] : [[ < D : Dispenser | next: N, last: L > < P : BProcess | mode: wait, number: num > C]] => 
+					[[ < D : Dispenser | next: N, last: L > < P : BProcess | mode: sleep, number: 0 > C]] .
+	
+	crl [next-turn] : [[ < D : Dispenser | next: N, last: L > C]] => [[ < D : Dispenser | next: s N, last: L > C]] if nextTurn(noSleep(C), N) =/= N .
+endm
+
+
+mod ABSTRACT-BAKERY+ is
+	including BAKERY+ .
+	protecting NAT .
+
+	var P : Oid .
+	vars N J L rest : Nat .
+	var M : Mode .
+	var C : Configuration .
+
+	ceq [[ < 0 : Dispenser | next: N, last: J > C ]] = [[< 0 : Dispenser | next: 1, last: s (sd(N,J)) > decOrder(C, sd(N,1))]] if N > 1 .
+
+	op decOrder : Configuration Nat -> Configuration .
+	eq decOrder (none, rest) = none .
+	eq decOrder (< P : BProcess | mode: M, number: 0 > C , rest) = < P : BProcess | mode: M, number: 0 > decOrder(C, rest) .
+	eq decOrder (< P : BProcess | mode: M, number: L > C , rest) = < P : BProcess | mode: M, number: sd(L,rest) > decOrder(C, rest) .
+
+	*** Añadimos lo nuevo de ABSTRACT-BAKERY+
+	*** Tenemos que calcular si en la cola alguien se ha ido
+
+	ceq [[ < 0 : Dispenser | next: 1, last: J > C ]] = [[ < 0 : Dispenser | next: 1, last: sd(J,1) > deleteSpace(C, freePosition(C,1,C)) ]] 
+														if numProcess(C) < sd(J,1) .
+
+	vars ind num : Nat .
+	vars C1 C2 : Configuration .
+
+	op deleteSpace : Configuration Nat -> Configuration .	*** Decrecemos todos los indices
+	eq deleteSpace(none, ind) = none .
+	ceq deleteSpace( < P : BProcess | mode: M, number: L > C , ind) = < P : BProcess | mode: M, number: L > deleteSpace(C,ind) 
+																		if L < ind .
+	ceq deleteSpace( < P : BProcess | mode: M, number: L > C , ind) = < P : BProcess | mode: M, number: sd(L,1) > deleteSpace(C,ind) 
+																		if L > ind .
+
+	
+	op freePosition : Configuration Nat Configuration -> Nat .
+	eq freePosition(none, num, C) = num .
+	ceq freePosition( < P : BProcess | mode: M, number: L > C1, num, C2) = freePosition(C1,num,C2) if num =/= L .
+	ceq freePosition( < P : BProcess | mode: M, number: L > C1, num, C2) = freePosition(C2,s num,C2) if num == L .
+
+
+	op numProcess : Configuration -> Nat .
+	eq numProcess(none) = 0 .
+	eq numProcess( < P : BProcess | mode: crit, number: L > C1) = 1 + numProcess(C1) .
+	eq numProcess( < P : BProcess | mode: sleep, number: L > C1) = 1 + numProcess(C1) .
+	eq numProcess( < P : BProcess | mode: wait, number: L > C1) = 1 + numProcess(C1) .
+
+endm 
+
+
+
 
 
 
 
 eof
+
+*** EJERCICIO 1
+*** mod BAKERY
+
+*** Si no acotamos los search, estas son las salidas
+Maude> search  initial(5) =>! G:GBState .
+search in BAKERY : initial(5) =>! G:GBState .
+
+Maude> search  initial(5) =>* [[C:Configuration < P : BProcess | mode: crit, number: N:Nat > < P : BProcess | mode: crit, number: M:Nat > ]] .
+search in BAKERY : initial(5) =>* [[C < P : BProcess | mode: crit,number: N > < P : BProcess | mode: crit,number: M:Nat >]] .
+
+
 
 [Q2] 
 Maude> search [1, 100] initial(5) =>* [[C:Configuration < P : BProcess | mode: crit, number: N:Nat > < P : BProcess | mode: crit, number: M:Nat > ]] .
@@ -108,6 +198,51 @@ search [1, 100] in BAKERY : initial(5) =>! G:GBState .
 
 No solution.
 states: 21314  rewrites: 42031 in 172ms cpu (172ms real) (244366 rewrites/second)
+
+
+*** mod ABSTRACT-BAKERY
+[Q5]
+Maude> search initial(2) =>* g:GBState . 
+search in ABSTRACT-BAKERY-CHECK : initial(2) =>* g:GBState .
+
+Solution 1 (state 0)
+states: 1  rewrites: 4 in 0ms cpu (0ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 1 > < 1 : BProcess | mode: sleep,number: 0 > < 2 : BProcess | mode: sleep,number: 0 >]]
+
+Solution 2 (state 1)
+states: 2  rewrites: 6 in 0ms cpu (0ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 2 > < 1 : BProcess | mode: wait,number: 1 > < 2 : BProcess | mode: sleep,number: 0 >]]
+
+Solution 3 (state 2)
+states: 3  rewrites: 8 in 0ms cpu (0ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 2 > < 1 : BProcess | mode: sleep,number: 0 > < 2 : BProcess | mode: wait,number: 1 >]]
+
+Solution 4 (state 3)
+states: 4  rewrites: 10 in 0ms cpu (0ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 3 > < 1 : BProcess | mode: wait,number: 1 > < 2 : BProcess | mode: wait,number: 2 >]]
+
+Solution 5 (state 4)
+states: 5  rewrites: 12 in 0ms cpu (0ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 2 > < 1 : BProcess | mode: crit,number: 1 > < 2 : BProcess | mode: sleep,number: 0 >]]
+
+Solution 6 (state 5)
+states: 6  rewrites: 14 in 0ms cpu (1ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 3 > < 1 : BProcess | mode: wait,number: 2 > < 2 : BProcess | mode: wait,number: 1 >]]
+
+Solution 7 (state 6)
+states: 7  rewrites: 16 in 0ms cpu (1ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 2 > < 1 : BProcess | mode: sleep,number: 0 > < 2 : BProcess | mode: crit,number: 1 >]]
+
+Solution 8 (state 7)
+states: 8  rewrites: 18 in 0ms cpu (1ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 3 > < 1 : BProcess | mode: crit,number: 1 > < 2 : BProcess | mode: wait,number: 2 >]]
+
+Solution 9 (state 8)
+states: 9  rewrites: 31 in 0ms cpu (1ms real) (~ rewrites/second)
+g:GBState --> [[< 0 : Dispenser | next: 1,last: 3 > < 1 : BProcess | mode: wait,number: 2 > < 2 : BProcess | mode: crit,number: 1 >]]
+
+No more solutions.
+states: 9  rewrites: 62 in 4ms cpu (2ms real) (15500 rewrites/second)
 
 [Q6]
 Maude> red modelCheck(initial(5), [] ((critical-proc(1) /\ no-critical-proc(2) /\ no-critical-proc(3) /\ no-critical-proc(4) /\ no-critical-proc(5)) \/ 
@@ -141,6 +276,22 @@ rewrites: 33986 in 636ms cpu (633ms real) (53437 rewrites/second)
 result Bool: true
 
 
+*** EJERCICIO 2
+[Q9]
+Maude> search initial(5) =>* [[C:Configuration < P : BProcess | mode: crit, number: N:Nat > < P : BProcess | mode: crit, number: M:Nat > ]] .
+search in BAKERY+ : initial(5) =>* [[C < P : BProcess | mode: crit,number: N > < P : BProcess | mode: crit,number: M:Nat >]] .
+
+[Q11]
+Maude> search initial(5) =>! G:GBState .
+search in ABSTRACT-BAKERY+ : initial(5) =>! G:GBState .
+
+No solution.
+states: 37010  rewrites: 5263686 in 4072ms cpu (4073ms real) (1292653 rewrites/second)
 
 
+Maude> search initial(5) =>* [[C:Configuration < P : BProcess | mode: crit, number: N:Nat > < P : BProcess | mode: crit, number: M:Nat > ]] .
+search in ABSTRACT-BAKERY+ : initial(5) =>* [[C < P : BProcess | mode: crit,number: N > < P : BProcess | mode: crit,number: M:Nat >]] .
+
+No solution.
+states: 37010  rewrites: 5263686 in 4104ms cpu (4101ms real) (1282574 rewrites/second)
 
