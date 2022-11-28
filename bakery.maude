@@ -104,7 +104,7 @@ mod BAKERY+ is
 	eq noSleep (none) = none .		
 	eq noSleep (< P : BProcess | mode: wait, number: num > C) = < P : BProcess | mode: wait, number: num > noSleep(C) .
 	eq noSleep (< P : BProcess | mode: crit, number: num > C) = < P : BProcess | mode: crit, number: num > noSleep(C) .
-	eq noSleep (< P : BProcess | mode: crit, number: num > C) = noSleep(C) .
+	eq noSleep (< P : BProcess | mode: sleep, number: num > C) = noSleep(C) .
 
 
 	vars P D : Oid .
@@ -286,12 +286,12 @@ Maude> search initial(5) =>! G:GBState .
 search in ABSTRACT-BAKERY+ : initial(5) =>! G:GBState .
 
 No solution.
-states: 37010  rewrites: 5263686 in 4072ms cpu (4073ms real) (1292653 rewrites/second)
+states: 3766  rewrites: 658088 in 372ms cpu (371ms real) (1769053 rewrites/second)
 
 
 Maude> search initial(5) =>* [[C:Configuration < P : BProcess | mode: crit, number: N:Nat > < P : BProcess | mode: crit, number: M:Nat > ]] .
 search in ABSTRACT-BAKERY+ : initial(5) =>* [[C < P : BProcess | mode: crit,number: N > < P : BProcess | mode: crit,number: M:Nat >]] .
 
 No solution.
-states: 37010  rewrites: 5263686 in 4104ms cpu (4101ms real) (1282574 rewrites/second)
+states: 3766  rewrites: 658088 in 368ms cpu (367ms real) (1788282 rewrites/second)
 
