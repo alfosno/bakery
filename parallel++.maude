@@ -1,222 +1,237 @@
 *** Alfonso Salas Pérez
-*** Francisco de P.Arjona Jiménez
+*** Francisco de P. Arjona Jiménez
+
+---- PARALLEL: A simple parallel language and its rewriting logic semantics.
+
+---- Memory model with locations named by Qids holding Ints.
 
 fmod MEMORY is
     protecting INT .
-    protecting BOOL .
+    protecting QID .
     protecting LIST{Int} .
+    protecting BOOL .
     protecting LIST{Bool} .
 
-    sorts IntVar BoolVar IntArray BoolArray Memory .
-    subsorts Int < IntVar IntArray .
-    subsorts Bool < BoolVar BoolArray .
+    sorts Memory Bool? .
+    subsorts Bool < Bool? .
+    sorts IntVar ArrayInts BoolVar  ArrayBools .
+    subsorts Int < IntVar ArrayInts .
+    subsorts Bool < BoolVar ArrayBools .
 
-    op _[_] : IntVar Int -> IntArray .
-    op _[_] : IntVar IntVar -> IntArray .
-    op _[_] : BoolVar Int -> BoolArray .
-    op _[_] : BoolVar IntVar -> BoolArray .
     op none : -> Memory .
     op __ : Memory Memory -> Memory [assoc comm id: none] .
     op [_,_] : IntVar List{Int} -> Memory .
     op [_,_] : BoolVar List{Bool} -> Memory .
+    op _[_] : IntVar IntVar -> ArrayInts .
+    op _[_] : BoolVar IntVar -> ArrayBools .
+    op _in_ : IntVar Memory -> Bool? . ---- cell allocated for Q?
+    op _in_ : BoolVar Memory -> Bool? . ---- cell allocated for Q?
 
-    var IV : IntVar .
-    var BV : BoolVar .
-    var IL : List{Int} .
-    var BL : List{Bool} .
-    var N N’ : Int .
+    vars intV : IntVar .
+    vars boolV : BoolVar . 
+    var M : Memory . 
+    var N : Int .
     var B : Bool .
-    var M : Memory .
-    
-    op get : IntArray Memory -> Int .
-    eq get((IV[0]), [IV, N’ IL] M) = N’ .
-    eq get((IV[s(N)]), [IV, N’ IL] M) = get((IV[N]), [IV, IL] M) .
-
-    op get : BoolArray Memory -> Bool .
-    eq get((BV[0]), [BV, B BL] M) = B .
-    eq get((BV[s(N)]), [BV, B BL] M) = get((BV[N]), [BV, BL] M) .
+    eq intV in [intV, N] M = true . ---- incomplete, only positive cases
+    eq boolV in [boolV, B] M = true . ---- incomplete, only positive cases
 endfm
+
+---- Test comparing the contents of a named memory location to an integer. 
+---- By default, value of non-allocated Qid is 0.
 
 fmod TESTS is
     inc MEMORY .
-
     sort Test .
-    
     op _=_ : IntVar IntVar -> Test .
-    op _=_ : IntArray IntVar -> Test .
-    op _=_ : IntArray IntArray -> Test .
-    op _=_ : BoolVar BoolVar -> Test .
-    op _=_ : BoolArray BoolVar -> Test .
-    op _=_ : BoolArray BoolArray -> Test .
     op _!=_ : IntVar IntVar -> Test .
-    op _!=_ : IntArray IntVar -> Test .
+    op _>'_ : IntVar IntVar -> Test .
+    op _=_ : ArrayInts IntVar -> Test .
+    op _!=_ : ArrayInts IntVar -> Test .
+    op _>'_ : ArrayInts IntVar -> Test .
+    op _=_ : BoolVar BoolVar -> Test .
     op _!=_ : BoolVar BoolVar -> Test .
-    op _!=_ : BoolArray BoolVar -> Test .
-    op _>’_ : IntVar IntVar -> Test .
-    op _>’_ : IntArray IntVar -> Test .
-    op _>’_ : IntArray IntArray -> Test .
+    op _=_ : ArrayBools BoolVar -> Test .
+    op _!=_ : ArrayBools BoolVar -> Test .
     op _&_ : Test Test -> Test [assoc] .
     op _|_ : Test Test -> Test [assoc] .
     op eval : Test Memory -> Bool .
+    op valor : ArrayInts Memory -> Int .
+    op valor : ArrayBools Memory -> Bool .
 
-    vars IV IV’ IV’’ : IntVar . 
-    vars BV BV’ : BoolVar . 
+    var intV : IntVar . 
+    var boolV : BoolVar .
+    var intL : List{Int} .
+    var boolL : List{Bool} .
     var M : Memory .
-    var N N’ K : Int .
-    var B B’ O : Bool .
-    var IL : List{Int} .
-    var BL : List{Bool} . 
-    vars T T’ : Test .
+    vars N N' : Int .
+    var B : Bool .
+    eq valor(intV[0], [intV, N' intL] M) = N' .
+    eq valor(intV[s N], [intV, N' intL] M) = valor(intV[N], [intV, intL] M) .
+    eq valor(boolV[0], [boolV, B boolL] M) = B .
+    eq valor(boolV[s N], [boolV, B boolL] M) = valor(boolV[N], [boolV, boolL] M) .
 
-    eq eval((IV = N), [IV, N’] M) = (N == N’) .
-    eq eval((IV = IV’), [IV, N] [IV’, N’] M) = (N == N’) .
-    eq eval(((IV[N]) = K), M) = (get((IV[N]), M) == K) .
-    eq eval(((IV[N]) = (IV’[N’])), M) = eval(((IV[N]) = get((IV’[N’]), M)), M) .
-    eq eval(((IV[N]) = (IV’[IV’’])), [IV’’, N’] M) = eval(((IV[N]) = (IV’[N’])), M) .
+    vars intV1 intV2 intV3 : IntVar . 
+    vars boolV1 boolV2 : BoolVar . 
+    vars C D : Bool .
+    var K : Int .
 
-    eq eval((BV = B), [BV, B’] M) = (B == B’) .
-    eq eval((BV = BV’), [BV, B] [BV’, B’] M) = (B == B’) .
-    eq eval(((BV[N]) = O), M) = (get((BV[N]), M) == O) .
-    eq eval(((BV[IV]) = O), [IV, N] M) = (get((BV[N]), M) == O) .
+    eq eval(intV1 = N, [intV1, N'] M) = N == N' .
+    ceq eval(intV1 = N, M) = N == 0 if intV1 in M =/= true .
+    eq eval(intV1 = intV2, [intV1, N] [intV2, N'] M) = N == N' .
+    eq eval(intV1[N] = K, M) = valor(intV1[N], M) == K .
+    eq eval(intV1[N] = intV2[N'], M) = valor(intV1[N], M) == valor(intV2[N'], M) .
+    eq eval(intV1 != N', [intV1, N] M) = N =/= N' .
+    eq eval(intV1 != intV2, [intV1, N] [intV2, N'] M) = N =/= N' .
+    eq eval(intV1[N] != N', M) = valor(intV1[N], M) =/= N' .
+    eq eval(intV1[intV2] != K, [intV2, N] M) = valor(intV1[N], M) =/= K .
+    eq eval(N >' intV1, [intV1, K] M) = (N > K) .
+    eq eval(intV1 >' intV2, [intV1, K] [intV2, N] M) = (K > N) .
+    eq eval(intV1[N] >' N', M) = (valor(intV1[N], M) > N') .
+    eq eval(intV1[N] >' intV2[N'], M) = eval(intV1[N] >' valor(intV2[N'], M), M) .
+   
+    eq eval(boolV1 = B, [boolV1, C] M) = B == C .
+    ceq eval(boolV1 = B, M) = B == false if boolV1 in M =/= true .
+    eq eval(boolV1 = boolV2, [boolV1, B] [boolV2, C] M) = B == C .
+    eq eval(boolV1[N] = D, M) = valor(boolV1[N], M) == D .
+    eq eval(boolV1[intV1] = D, [intV1, N] M) = valor(boolV1[N], M) == D .
+    eq eval(B != C, M) = (B =/= C) .
+    eq eval(boolV1 != C, [boolV1, B] M) = (B =/= C) .
+    eq eval(boolV1 != boolV2, [boolV1, B] [boolV2, C] M) = (B =/= C) .
 
-    eq eval((N != N’), M) = (N =/= N’) .
-    eq eval((IV != N’), [IV, N] M) = (N =/= N’) .
-    eq eval((IV != IV’), [IV, N] [IV’, N’] M) = (N =/= N’) .
-    eq eval(((IV[N]) != N’), M) = (get((IV[N]), M) =/= N’) .
-    eq eval(((IV[IV’]) != K), [IV’, N] M) = eval(((IV[N]) != K), M) .
-
-    eq eval((B != B’), M) = (B =/= B’) .
-    eq eval((BV != B’), [BV, B] M) = (B =/= B’) .
-    eq eval((BV != BV’), [BV, B] [BV’, B’] M) = (B =/= B’) .
-
-    eq eval((N >’ IV), [IV, K] M) = (N > K) .
-    eq eval((IV >’ N), [IV, K] M) = (K > N) .
-    eq eval((IV >’ IV’), [IV, K] [IV’, N] M) = (K > N) .
-    eq eval(((IV[N]) >’ N’), M) = (get((IV[N]), M) > N’) .
-    eq eval(((IV[N]) >’ (IV’[N’])), M) = eval(((IV[N]) >’ get((IV’[N’]), M)), M) .
-    eq eval(((IV[N]) >’ (IV’[IV’’])), [IV’’, N’] M) = eval(((IV[N]) >’ (IV’[N’])), M) .
-    
-    eq eval((T & T’), M) = (eval(T, M) and eval(T’, M)) .
-    eq eval((T | T’), M) = (eval(T, M) or eval(T’, M)) .
+    vars T T' : Test .
+    eq eval(T & T', M) = eval(T, M) and eval(T', M) .
+    eq eval(T | T', M) = eval(T, M) or eval(T', M) .
 endfm
 
+---- Syntax for arithmetic expressions, and their evaluation semantics.
+---- To avoid evaluation of expressions by themselves, the operators
+---- + and * are specified as constructors with syntax +’ and *’ 
 fmod EXPRESSION is
     inc MEMORY . 
-
-    sorts IntExpression BoolExpression .
-    subsorts IntVar IntArray < IntExpression .
-    subsorts BoolVar BoolArray < BoolExpression .
-
-    op _+’_ : IntExpression IntExpression -> IntExpression [ctor] .
-    op _*’_ : IntExpression IntExpression -> IntExpression [ctor] .
-    op intEval1 : IntVar Memory -> Int .
-    op intEval2 : IntArray Memory -> List{Int} .
-    op boolEval1 : BoolVar Memory -> Bool .
-    op boolEval2 : BoolArray Memory -> List{Bool} .
-
-    vars IV IV’ : IntVar . 
-    var BV : BoolVar . 
+    pr TESTS .
+    sorts Expression ExpressionBoolean .
+    subsorts IntVar ArrayInts < Expression .
+    subsorts BoolVar ArrayBools < ExpressionBoolean .
+    op _+'_ : Expression Expression -> Expression [ctor] .
+    op _*'_ : Expression Expression -> Expression [ctor] .
+    op _-'_ : Expression Expression -> Expression [ctor] .
+    op eval : IntVar Memory -> Int .
+    op eval : BoolVar Memory -> Bool .
+    op evalArr : ArrayInts Memory -> List{Int} .
+    op evalArr : ArrayBools Memory -> List{Bool} .
+    
+    vars intV1 intV2 : IntVar . 
+    var boolV : BoolVar . 
     var M : Memory . 
-    vars N N’ K : Int .
-    vars B B’ O : Bool . 
-    var IL : List{Int} .
-    var BL : List{Bool} .
-    vars IE IE’ : IntExpression .
-    var IA : IntArray .
-    var BA : BoolArray .
+    vars N N' K : Int .
+    vars B C : Bool . 
+    var intL : List{Int} .
+    var boolL : List{Bool} .
+    vars E E' : Expression .
 
-    eq intEval1(K, M) = K .
-    eq intEval1(IV, [IV, K] M) = K .
-    eq intEval1(IV[N], M) = get(IV[N], M) .
-    eq intEval1(IV[IV’], [IV’, N] M) = get(IV[N], M) .
+    eq eval(K, M) = K .
+    eq eval(intV1, [intV1, K] M) = K .
+    ceq eval(intV1, M) = 0 if intV1 in M =/= true .
+    eq eval(intV1[N], M) = valor(intV1[N], M) .
+    eq eval(intV1[intV2], [intV2, N] M) = valor(intV1[N], M) .
+    eq eval(C, M) = C .
+    eq eval(boolV, [boolV, C] M) = C .
+    ceq eval(boolV, M) = false if boolV in M =/= true .
 
-    eq intEval2(K, [IV[0], N’ IL] M) = K IL .
-    eq intEval2(K, [IV[s(N)], N’ IL] M) = N’ intEval2(K, [IV[N], IL] M) .
-    eq intEval2(IV, [IV, K] [IV’[0], N’ IL] M) = K IL .
-    eq intEval2(IV, [IV, K] [IV’[s(N)], N’ IL] M) = N’ intEval2(IV, [IV’[N], IL] M) .
+    eq evalArr(K, [intV1[0], N' intL] M) = K intL .
+    eq evalArr(K, [intV1[s N], N' intL] M) = N' evalArr(K, [intV1[N], intL] M) .
+    eq evalArr(intV1, [intV1, K] [intV2[0], N' intL] M) = K intL .
+    eq evalArr(intV1, [intV1, K] [intV2[s N], N' intL] M) = N' evalArr(intV1, [intV2[N], intL] M) .
+    eq evalArr(C, [boolV[0], B boolL] M) = C boolL .
+    eq evalArr(C, [boolV[s N], B boolL] M) = B evalArr(C, [boolV[N], boolL] M) .
 
-    eq boolEval1(O, M) = O .
-    eq boolEval1(BV, [BV, O] M) = O .
-
-    eq boolEval2(O, [BV[0], B BL] M) = O BL .
-    eq boolEval2(O, [BV[s(N)], B BL] M) = B boolEval2(O, [BV[N], BL] M) .
-
-    eq intEval1((IE +’ IE’), M) = (intEval1(IE, M) + intEval1(IE’, M)) .
-    eq intEval1((IE *’ IE’), M) = (intEval1(IE, M) * intEval1(IE’, M)) .
+    eq eval(E +' E', M) = eval(E, M) + eval(E', M) .
+    eq eval(E *' E', M) = eval(E, M) * eval(E', M) .
+    ***eq eval(E -' E', M) = eval(E, M) - eval(E', M) .
 endfm
+
+---- Syntax for a trival sequential programming language. 
+---- We allow abstracting out program fragments as elements of sorts LoopingUserStatement and UserStatement. 
+---- LoopingUserStatements abstract out potentially nonterminating program fragments. 
+---- UserStatements which are not LoopingUserStatements abstract out terminating program fragments.
 
 fmod SEQUENTIAL is
     inc TESTS .
     inc EXPRESSION .
-
     sorts UserStatement LoopingUserStatement Program .
     subsort LoopingUserStatement < UserStatement < Program .
-
     op skip : -> Program .
     op _;_ : Program Program -> Program [prec 61 assoc id: skip] .
-    op _:=_ : IntExpression IntExpression -> Program .
-    op _:=_ : BoolExpression BoolExpression -> Program .
+    op _:=_ : Expression Expression -> Program .
+    op _:=_ : ExpressionBoolean ExpressionBoolean -> Program .
     op if_then_fi : Test Program -> Program .
-    op if_then_else_fi : Test Program Program -> Program .
     op while_do_od : Test Program -> Program .
-    op whilenot_do_od : Test Program -> Program .
-    op repeat_until_li : Program Test -> Program .
     op repeat_forever : Program -> Program .
+    op if_then_else_fi : Test Program Program -> Program .
+    op repeat_until_li : Program Test -> Program .
 endfm
 
 mod PARALLEL++ is
     inc SEQUENTIAL .
     inc TESTS .
-    
     sorts Pid Process Soup MachineState .
     subsort Process < Soup .
     subsort Int < Pid .
-
     op [_,_] : Pid Program -> Process .
     op empty : -> Soup .
     op _|_ : Soup Soup -> Soup [prec 61 assoc comm id: empty] .
     op {_,_} : Soup Memory -> MachineState .
 
-    vars P P' R : Program . 
+    vars P Q  R : Program . 
     var  S : Soup .
     var  U : UserStatement . 
     var  L : LoopingUserStatement .
     vars I J : Pid . 
     var  M : Memory .
-    var T : Test . 
-    vars IV IV’ : IntVar . 
     vars N X : Int .
-    var IL : List{Int} .
-    var IE : IntExpression .
-    var IA : IntArray .
-    var BV : BoolVar . 
-    vars B O : Bool .
-    var BL : List{Bool} .
-    var BE : BoolExpression .
-    var BA : BoolArray .
-    
+    var T : Test . 
+    var E : Expression .
+    var EBool : ExpressionBoolean .
+    vars B : Bool .
+    var intV : IntVar . 
+    var boolV : BoolVar . 
+    var intL : List{Int} .
+    var boolL : List{Bool} .
     rl {[I, L ; R] | S, M} => {[I, L ; R] | S, M} .
     rl {[I, U ; R] | S, M} => {[I, R] | S, M} .
 
-    rl {([I, ((IV := IE) ; R)] | S), [IV, X] M} => 
-       {([I, R] | S), [IV, intEval1(IE, [IV, X] M)] M} .
-    rl {([I, (((IV[N]) := IE) ; R)] | S), [IV, IL] M} => 
-       {([I, R] | S), [IV, intEval2(IE, [(IV[N]), IL] M)] M}  .
-    rl {([I, ((BV := BE) ; R)] | S), [BV, B] M} => 
-       {([I, R] | S), [BV, boolEval1(BE, [BV, B] M)] M} .
-    rl {([I, (((BV[N]) := BE) ; R)] | S), [BV, BL] M} => 
-       {([I, R] | S), [BV, boolEval2(BE, [(BV[N]), BL] M)] M}  .
+    rl {[I, (intV := E) ; R] | S, [intV, X] M}
+      => {[I, R] | S, [intV, eval(E, [intV, X] M)] M} .
+    crl {[I, (intV := E) ; R] | S, M}
+      => {[I, R] | S, [intV, eval(E, M)] M} 
+      if intV in M =/= true .
 
-    rl {[I, if T then P fi ; R] | S, M} => 
-       {[I, if eval(T, M) then P else skip fi ; R] | S, M} .
-    rl {[I, if T then P else P' fi ; R] | S, M} => 
-       {[I, if eval(T, M) then P else P' fi ; R] | S, M} .
-    rl {[I, while T do P od ; R] | S, M} => 
-       {[I, if eval(T, M) then (P ; while T do P od) else skip fi ; R] | S, M} .
-    rl {[I, whilenot T do P od ; R] | S, M} => 
-       {[I, if (not eval(T, M)) then (P ; whilenot T do P od) else skip fi ; R] | S, M} .
-    rl {[I, repeat P until T li ; R] | S, M} => 
-       {[I, P ; whilenot T do P od ; R] | S, M} .
-    rl {[I, repeat P forever ; R] | S, M} => 
-       {[I, P ; repeat P forever ; R] | S, M} .
+    rl {[I, (boolV := EBool) ; R] | S, [boolV, B] M}
+      => {[I, R] | S, [boolV, eval(EBool, [boolV, B] M)] M} .
+    crl {[I, (boolV := EBool) ; R] | S, M}
+      => {[I, R] | S, [boolV, eval(EBool, M)] M} 
+      if boolV in M =/= true .
+
+    rl {[I, (intV[N] := E) ; R] | S, [intV, intL] M}
+      => {[I, R] | S, [intV, evalArr(E, [intV[N], intL] M)] M}  .
+    rl {[I, (boolV[N] := EBool) ; R] | S, [boolV, boolL] M}
+      => {[I, R] | S, [boolV, evalArr(EBool, [boolV[N], boolL] M)] M}  .
+
+    rl {[I, if T then P fi ; R] | S, M} 
+      => {[I, if eval(T, M) then P else skip fi ; R] | S, M} .
+
+    rl {[I, while T do P od ; R] | S, M} 
+      => {[I, if eval(T, M) 
+              then (P ; while T do P od) 
+              else skip 
+              fi ; R] | S, M} .
+
+    rl {[I, repeat P forever ; R] | S, M} 
+      => {[I, P ; repeat P forever ; R] | S, M} .
+
+    rl {[I, if T then P else Q fi ; R] | S, M}
+      => {[I, if eval(T, M) then P else Q fi ; R] | S, M} .
+	  
+    rl {[I, repeat P until T li ; R] | S, M}
+      => {[I, P ; if eval(T, M) then skip else (repeat P until T li) fi ; R] | S, M} .
 endm
